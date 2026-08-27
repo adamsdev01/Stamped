@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Options;
+using Stamped.Core.Llm;
+using Stamped.Infrastructure.Llm;
 using Stamped.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -6,6 +9,20 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.Configure<LlmOptions>(builder.Configuration.GetSection("Llm"));
+builder.Services.AddHttpClient<OllamaLlmProvider>();
+
+builder.Services.AddScoped<ILlmProvider>(sp =>
+{
+    var opts = sp.GetRequiredService<IOptions<LlmOptions>>().Value;
+    return opts.Provider switch
+    {
+        "Ollama" => sp.GetRequiredService<OllamaLlmProvider>(),
+        // "Anthropic" => sp.GetRequiredService<AnthropicLlmProvider>(), 
+        // "OpenAI"    => sp.GetRequiredService<OpenAiLlmProvider>(), 
+        _ => throw new NotSupportedException($"Unknown LLM provider: {opts.Provider}")
+    };
+});
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
