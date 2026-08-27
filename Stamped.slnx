@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Stamped.Core/Stamped.Core.csproj" Id="7aa1c80a-ad6b-43d6-aa51-e5386319cb14" />
+  <Project Path="Stamped.Infrastructure/Stamped.Infrastructure.csproj" Id="e5391fea-3a23-47b3-97c2-303cf70379a5" />
+  <Project Path="Stamped.Web/Stamped.Web.csproj" Id="755370ee-ee80-4067-a331-ae9a15577516" />
+</Solution>
