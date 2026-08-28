@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Stamped.Core.Llm;
-using Stamped.Infrastructure.Llm;
-using Stamped.Web.Components;
+using Stamped.Core.Resumes;
 using Stamped.Infrastructure.Data;
+using Stamped.Infrastructure.Llm;
+using Stamped.Infrastructure.Resumes;
+using Stamped.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +17,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddDbContext<StampedDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("StampedDb")));
 
-// Register the LLM provider/Services
+#region Register the LLM provider/Services
 builder.Services.Configure<LlmOptions>(builder.Configuration.GetSection("Llm"));
 builder.Services.AddHttpClient<OllamaLlmProvider>();
 
@@ -30,6 +32,9 @@ builder.Services.AddScoped<ILlmProvider>(sp =>
         _ => throw new NotSupportedException($"Unknown LLM provider: {opts.Provider}")
     };
 });
+#endregion
+
+builder.Services.AddScoped<IResumeParser, PdfResumeParser>();
 
 var app = builder.Build();
 
@@ -53,7 +58,6 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<StampedDbContext>();
     db.Database.Migrate();
-    await JobFolderSeeder.SeedAsync(db, Path.Combine(builder.Environment.ContentRootPath, "Data", "jobs.json"));
 }
 
 app.Run();

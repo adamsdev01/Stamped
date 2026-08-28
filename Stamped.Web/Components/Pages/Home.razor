@@ -1,7 +1,47 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@using Stamped.Core.Resumes
+@using Stamped.Infrastructure.Data
+@inject IResumeParser ResumeParser
+@inject StampedDbContext Db
 
 <PageTitle>Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1>Stamp It!</h1>
 
-Welcome to your new app.
+<InputFile OnChange="HandleUpload" accept=".pdf" />
+
+@if (isProcessing)
+{
+    <p>Reading resume...</p>
+}
+
+@if (parsedResume is not null)
+{
+    <div>
+        <p><strong>Most recent role:</strong> @parsedResume.MostRecentRole</p>
+        <p><strong>Years experience:</strong> @parsedResume.YearsExperience</p>
+        <p><strong>Skills:</strong> @string.Join(", ", parsedResume.Skills)</p>
+    </div>
+}
+
+@code {
+    private bool isProcessing;
+    private Stamped.Core.Models.Resume? parsedResume;
+
+    private async Task HandleUpload(InputFileChangeEventArgs e)
+    {
+        isProcessing = true;
+        StateHasChanged();
+
+        var file = e.File;
+        using var stream = file.OpenReadStream(maxAllowedSize: 10_000_000); // 10MB cap
+
+        parsedResume = await ResumeParser.ParseAsync(stream, file.Name);
+
+        Db.Resumes.Add(parsedResume);
+        await Db.SaveChangesAsync();
+
+        isProcessing = false;
+    }
+}
