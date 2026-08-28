@@ -1,9 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Stamped.Core.CoverLetters;
 using Stamped.Core.Llm;
+using Stamped.Core.Matching;
 using Stamped.Core.Resumes;
+using Stamped.Infrastructure.CoverLetters;
 using Stamped.Infrastructure.Data;
 using Stamped.Infrastructure.Llm;
+using Stamped.Infrastructure.Matching;
 using Stamped.Infrastructure.Resumes;
 using Stamped.Web.Components;
 
@@ -35,6 +39,8 @@ builder.Services.AddScoped<ILlmProvider>(sp =>
 #endregion
 
 builder.Services.AddScoped<IResumeParser, PdfResumeParser>();
+builder.Services.AddScoped<IJobMatcher, LlmJobMatcher>();
+builder.Services.AddScoped<ICoverLetterDrafter, LlmCoverLetterDrafter>();
 
 var app = builder.Build();
 

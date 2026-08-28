@@ -2,7 +2,12 @@
 @rendermode InteractiveServer
 @using Stamped.Core.Resumes
 @using Stamped.Infrastructure.Data
+@using Stamped.Core.Matching
+@using Stamped.Core.Models
+@using Stamped.Core.CoverLetters
+@inject ICoverLetterDrafter CoverLetterDrafter
 @inject IResumeParser ResumeParser
+@inject IJobMatcher JobMatcher
 @inject StampedDbContext Db
 
 <PageTitle>Home</PageTitle>
@@ -24,23 +29,97 @@
         <p><strong>Skills:</strong> @string.Join(", ", parsedResume.Skills)</p>
     </div>
 }
+@if (matches.Any())
+{
+    <h2>Matches</h2>
+    <ul>
+        @foreach (var m in matches)
+        {
+            <li>
+                <strong>@m.JobPosting.Title</strong> — @m.JobPosting.Company (@m.MatchScore%)
+                <br /><em>@m.Reasoning</em>
+                <br />
+                <button @onclick="() => DraftLetter(m)">Draft cover letter</button>
+            </li>
+        }
+    </ul>
+}
+@if (currentApplication is not null)
+{
+    <h2>Cover letter — @currentApplication.JobMatch.JobPosting.Title</h2>
+    <p>Status: @currentApplication.Status</p>
+    <pre style="white-space: pre-wrap;">@currentApplication.CoverLetter</pre>
+}
 
 @code {
     private bool isProcessing;
-    private Stamped.Core.Models.Resume? parsedResume;
+    private string statusText = "";
+    private Resume? parsedResume;
+    private List<JobMatch> matches = new();
+    private JobApplication? currentApplication;
 
     private async Task HandleUpload(InputFileChangeEventArgs e)
     {
         isProcessing = true;
+        statusText = "Reading resume...";
         StateHasChanged();
 
         var file = e.File;
-        using var stream = file.OpenReadStream(maxAllowedSize: 10_000_000); // 10MB cap
+        using var stream = file.OpenReadStream(maxAllowedSize: 10_000_000);
 
         parsedResume = await ResumeParser.ParseAsync(stream, file.Name);
-
         Db.Resumes.Add(parsedResume);
         await Db.SaveChangesAsync();
+
+        statusText = "Matching jobs...";
+        StateHasChanged();
+
+        var jobs = Db.JobPostings.ToList();
+        var results = await JobMatcher.MatchAsync(parsedResume, jobs);
+
+        Db.JobMatches.AddRange(results);
+        await Db.SaveChangesAsync();
+
+        matches = Db.JobMatches
+            .Where(m => m.ResumeId == parsedResume.Id)
+            .OrderByDescending(m => m.MatchScore)
+            .Select(m => new JobMatch
+            {
+                Id = m.Id,
+                MatchScore = m.MatchScore,
+                Reasoning = m.Reasoning,
+                JobPosting = Db.JobPostings.First(j => j.Id == m.JobPostingId)
+            })
+            .ToList();
+
+        isProcessing = false;
+    }
+
+    private async Task DraftLetter(JobMatch match)
+    {
+        statusText = "Drafting cover letter...";
+        isProcessing = true;
+        StateHasChanged();
+
+        var letter = await CoverLetterDrafter.DraftAsync(parsedResume!, match.JobPosting);
+
+        var application = new JobApplication
+        {
+            JobMatchId = match.Id,
+            CoverLetter = letter,
+            Status = ApplicationStatus.Draft
+        };
+
+        Db.Applications.Add(application);
+        await Db.SaveChangesAsync();
+
+        currentApplication = new JobApplication
+        {
+            Id = application.Id,
+            CoverLetter = application.CoverLetter,
+            Status = application.Status,
+            JobMatch = match
+        };
 
         isProcessing = false;
     }
