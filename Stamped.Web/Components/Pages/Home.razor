@@ -1,70 +1,133 @@
 ﻿@page "/"
 @rendermode InteractiveServer
-@using System.Text.Json
-@using Stamped.Core.Resumes
-@using Stamped.Infrastructure.Data
-@using Stamped.Core.Jobs
-@using Stamped.Core.Models
-@using Stamped.Core.CoverLetters
 @implements IAsyncDisposable
-@inject ICoverLetterDrafter CoverLetterDrafter
-@inject IResumeParser ResumeParser
-@inject IJobMatcher JobMatcher
-@inject StampedDbContext Db
-@inject IJSRuntime JSRuntime
-@inject Microsoft.Extensions.Options.IOptions<JobOptions> JobOptions
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Stamp It!</PageTitle>
 
-<h1>Stamp It!</h1>
-
-<InputFile OnChange="HandleFileSelected" accept=".pdf" />
-<br />
-@if (isProcessing)
-{
-    <p>@statusText</p>
-}
-<br />
-@if (parsedResume is not null)
-{
+<header class="masthead">
     <div>
-        <p><strong>Most recent role:</strong> @parsedResume.MostRecentRole</p>
-        <p><strong>Years of experience:</strong> @parsedResume.YearsExperience</p>
-        <p><strong>Skills:</strong> @string.Join(", ", parsedResume.Skills)</p>
+        <div class="brand-mark">Stamp It!</div>
+        <div class="brand-sub">Job Application Portal</div>
     </div>
-}
-<br />
-@if (matches.Any())
-{
-    <h4>Job Matches</h4>
-    <ul>
-        @foreach (var m in matches)
+</header>
+
+<main>
+
+    <!-- Step 1: Upload + parse resume -->
+    <div class="step">
+        <div class="step-head">
+            <div class="step-title"><span class="step-num">1</span> Your resume</div>
+            <span class="tool-badge">parseResume()</span>
+        </div>
+
+        <div class="dropzone">
+            <div class="dropzone-icon">PDF</div>
+            <div class="dropzone-text">
+                <strong>Upload your resume</strong>
+                <span>PDF only</span>
+            </div>
+            <InputFile class="file-input" OnChange="HandleFileSelected" accept=".pdf" />
+        </div>
+
+        @if (isProcessing)
         {
-            <li>
-                <strong>@m.JobPosting.Title</strong> — @m.JobPosting.Company (@m.MatchScore% Match)
-                <br /><em>@m.Reasoning</em>
-                <br />
-                <button @onclick="() => DraftLetter(m)">Draft cover letter</button>
-            </li>
+            <div class="status-line"><span class="spinner"></span> @statusText</div>
         }
-    </ul>
-}
 
-@if (currentApplication is not null)
-{
-    <h2>Cover letter — @currentApplication.JobMatch.JobPosting.Title</h2>
-    <p>Status: @currentApplication.Status</p>
-    <pre style="white-space: pre-wrap;">@currentApplication.CoverLetter</pre>
-}
+        @if (parsedResume is not null)
+        {
+            <div class="summary-grid">
+                <div class="summary-field">
+                    <label>Most recent role</label>
+                    <div>@parsedResume.MostRecentRole</div>
+                </div>
+                <div class="summary-field">
+                    <label>Years of experience</label>
+                    <div>@parsedResume.YearsExperience</div>
+                </div>
+                <div class="summary-field full">
+                    <label>Skills found</label>
+                    <div class="tag-row">
+                        @foreach (var skill in parsedResume.Skills)
+                        {
+                            <span class="tag">@skill</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
 
-@if (currentApplication is not null && currentApplication.Status == ApplicationStatus.Draft)
-{
-    <button @onclick="SubmitApplication">Approve &amp; submit</button>
-}
-@if (currentApplication is not null && currentApplication.Status == ApplicationStatus.Submitted)
-{
-    <p>Submitted at @currentApplication.SubmittedAt</p>
-}
+    <!-- Step 2: Match jobs -->
+    <div class="step @(parsedResume is null ? "locked" : "")">
+        <div class="step-head">
+            <div class="step-title"><span class="step-num">2</span> Matches</div>
+            <span class="tool-badge">matchJobs()</span>
+        </div>
+
+        @if (matches.Any())
+        {
+            <div class="folder-list">
+                @foreach (var m in matches)
+                {
+                    <div class="folder">
+                        <div class="match-score">@m.MatchScore%</div>
+                        <div class="folder-body">
+                            <div class="role">@m.JobPosting.Title</div>
+                            <div class="company">@m.JobPosting.Company — @m.JobPosting.Location</div>
+                            <div class="reasoning">@m.Reasoning</div>
+                        </div>
+                        <button class="btn-draft" @onclick="() => DraftLetter(m)">Draft letter</button>
+                    </div>
+                }
+            </div>
+        }
+        else if (parsedResume is not null && !isProcessing)
+        {
+            <p class="empty-note">No matches yet.</p>
+        }
+    </div>
+
+    <!-- Step 3: Draft cover letter -->
+    @if (currentApplication is not null)
+    {
+        <div class="step">
+            <div class="step-head">
+                <div class="step-title"><span class="step-num">3</span> Cover letter — @currentApplication.JobMatch.JobPosting.Title</div>
+                <span class="tool-badge">draftCoverLetter()</span>
+            </div>
+            <div class="letter">
+                <div class="letterhead">
+                    <span>Status: @currentApplication.Status</span>
+                    <span>@currentApplication.JobMatch.JobPosting.Company</span>
+                </div>
+                <pre>@currentApplication.CoverLetter</pre>
+            </div>
+        </div>
+
+        <!-- Step 4: human approval -->
+        <div class="step approval-panel">
+            <div class="eyebrow">Human sign-off required</div>
+            <div class="step-title center">Review &amp; submit</div>
+
+            @if (currentApplication.Status == ApplicationStatus.Draft)
+            {
+                <p class="desc">This is the one step your agent can't take for you.</p>
+                <div class="stamp-zone">
+                    <button class="stamp-btn" @onclick="SubmitApplication">Approve<br />&amp; submit</button>
+                </div>
+                <span class="tool-badge human">submitApplication() — human only, no tool registered</span>
+            }
+            else if (currentApplication.Status == ApplicationStatus.Submitted)
+            {
+                <p class="submitted-note">Submitted at @currentApplication.SubmittedAt</p>
+            }
+        </div>
+    }
+
+</main>
+
+<footer>WebMcp - Every tool above is agent-callable except the stamp — that one belongs to you.</footer>
 
 @code {
     private bool isProcessing;
@@ -77,9 +140,6 @@
 
     private IJSObjectReference? _module;
     private DotNetObjectReference<Home>? _dotNetRef;
-
-    [Inject] 
-    private IJobSource JobSource { get; set; } = default!;
 
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
     {
@@ -134,7 +194,7 @@
         statusText = "Matching jobs...";
         await InvokeAsync(StateHasChanged);
 
-        var jobs = Db.JobPostings.Where(j => j.Source == "adzuna").ToList(); // or drop the filter to include folder jobs too
+        var jobs = Db.JobPostings.Where(j => j.Source == "adzuna").ToList();
         var results = await JobMatcher.MatchAsync(parsedResume, jobs);
 
         Db.JobMatches.AddRange(results);
@@ -143,7 +203,13 @@
         matches = Db.JobMatches
             .Where(m => m.ResumeId == parsedResume.Id)
             .OrderByDescending(m => m.MatchScore)
-            .Select(m => new JobMatch { Id = m.Id, MatchScore = m.MatchScore, Reasoning = m.Reasoning, JobPosting = Db.JobPostings.First(j => j.Id == m.JobPostingId) })
+            .Select(m => new JobMatch
+            {
+                Id = m.Id,
+                MatchScore = m.MatchScore,
+                Reasoning = m.Reasoning,
+                JobPosting = Db.JobPostings.First(j => j.Id == m.JobPostingId)
+            })
             .ToList();
 
         isProcessing = false;
@@ -190,8 +256,6 @@
         currentApplication.SubmittedAt = appEntity.SubmittedAt;
     }
 
-    // ---------- WebMCP registration via direct document.modelContext JS interop ----------
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
@@ -200,22 +264,11 @@
         {
             _module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/webmcp.js");
             _dotNetRef = DotNetObjectReference.Create(this);
-            var registered = await _module.InvokeAsync<bool>("initWebMcp", _dotNetRef);
-
-            if (!registered)
-            {
-                // document.modelContext wasn't present — WebMCP unavailable in this browser/session.
-                // Page still works fine for a human clicking buttons; agent tool calls just won't be offered.
-            }
+            await _module.InvokeAsync<bool>("initWebMcp", _dotNetRef);
         }
-        catch (JSDisconnectedException)
-        {
-            // circuit already gone, nothing to clean up
-        }
+        catch (JSDisconnectedException) { }
     }
 
-    // Single dispatcher every registered tool calls into. toolName picks the pipeline method;
-    // argsJson is parsed only for tools that need arguments.
     [JSInvokable]
     public async Task<string> ExecuteTool(string toolName, string argsJson)
     {
@@ -248,8 +301,6 @@
         }
         catch (Exception ex)
         {
-            // Returned as the tool's result text so the agent sees a clear failure reason
-            // instead of the call just throwing.
             return $"Error: {ex.Message}";
         }
     }

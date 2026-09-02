@@ -26,7 +26,7 @@ namespace Stamped.Infrastructure.Jobs
                        $"?app_id={_opts.AppId}&app_key={_opts.AppKey}" +
                        $"&what={Uri.EscapeDataString(query)}" +
                        $"&where={Uri.EscapeDataString(location)}" +
-                       $"&results_per_page=10";
+                       $"&results_per_page=5";
 
             var response = await _http.GetAsync(url, ct);
             response.EnsureSuccessStatusCode();

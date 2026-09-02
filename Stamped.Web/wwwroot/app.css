@@ -1,3 +1,25 @@
+:root {
+    --paper: #E7E2CE;
+    --paper-dark: #DCD5BA;
+    --paper-darker: #CFC7A8;
+    --ink: #221F19;
+    --ink-soft: #5A5540;
+    --ink-faint: #8C8567;
+    --stamp-blue: #1F4E8C;
+    --stamp-blue-soft: #E4EBF3;
+    --stamp-red: #9C3B2E;
+    --stamp-red-soft: #F3E4E0;
+    --gold: #B8862B;
+    --gold-soft: #F1E6C8;
+    --radius: 3px;
+}
+
+body {
+    margin: 0;
+    background: var(--paper);
+    min-height: 100vh;
+}
+
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }

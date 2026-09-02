@@ -9,3 +9,16 @@
 @using Stamped.Web
 @using Stamped.Web.Components
 @using Stamped.Web.Components.Layout
+@using System.Text.Json
+@using Stamped.Core.Resumes
+@using Stamped.Infrastructure.Data
+@using Stamped.Core.Models
+@using Stamped.Core.CoverLetters
+@using Stamped.Core.Jobs
+@inject ICoverLetterDrafter CoverLetterDrafter
+@inject IResumeParser ResumeParser
+@inject IJobMatcher JobMatcher
+@inject IJobSource JobSource
+@inject Microsoft.Extensions.Options.IOptions<JobOptions> JobOptions
+@inject StampedDbContext Db
+@inject IJSRuntime JSRuntime
