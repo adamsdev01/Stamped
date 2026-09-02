@@ -1,12 +1,12 @@
 ﻿using Stamped.Core.Llm;
-using Stamped.Core.Matching;
+using Stamped.Core.Jobs;
 using Stamped.Core.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
 
-namespace Stamped.Infrastructure.Matching
+namespace Stamped.Infrastructure.Jobs
 {
     /// <summary>
     /// One Llm call per job posting, with the resume and job description as input. 

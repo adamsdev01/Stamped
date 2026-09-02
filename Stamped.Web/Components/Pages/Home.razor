@@ -3,7 +3,7 @@
 @using System.Text.Json
 @using Stamped.Core.Resumes
 @using Stamped.Infrastructure.Data
-@using Stamped.Core.Matching
+@using Stamped.Core.Jobs
 @using Stamped.Core.Models
 @using Stamped.Core.CoverLetters
 @implements IAsyncDisposable
@@ -12,6 +12,7 @@
 @inject IJobMatcher JobMatcher
 @inject StampedDbContext Db
 @inject IJSRuntime JSRuntime
+@inject Microsoft.Extensions.Options.IOptions<JobOptions> JobOptions
 
 <PageTitle>Home</PageTitle>
 
@@ -77,6 +78,9 @@
     private IJSObjectReference? _module;
     private DotNetObjectReference<Home>? _dotNetRef;
 
+    [Inject] 
+    private IJobSource JobSource { get; set; } = default!;
+
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
     {
         var file = e.File;
@@ -113,10 +117,24 @@
         if (parsedResume is null) throw new InvalidOperationException("Parse the resume first.");
 
         isProcessing = true;
+        statusText = "Searching jobs...";
+        await InvokeAsync(StateHasChanged);
+
+        var query = parsedResume.MostRecentRole;
+        var location = JobOptions.Value.DefaultLocation;
+        var fetched = await JobSource.SearchAsync(query, location);
+
+        foreach (var job in fetched)
+        {
+            var exists = Db.JobPostings.Any(j => j.ExternalId == job.ExternalId && job.ExternalId != "");
+            if (!exists) Db.JobPostings.Add(job);
+        }
+        await Db.SaveChangesAsync();
+
         statusText = "Matching jobs...";
         await InvokeAsync(StateHasChanged);
 
-        var jobs = Db.JobPostings.ToList();
+        var jobs = Db.JobPostings.Where(j => j.Source == "adzuna").ToList(); // or drop the filter to include folder jobs too
         var results = await JobMatcher.MatchAsync(parsedResume, jobs);
 
         Db.JobMatches.AddRange(results);
@@ -125,13 +143,7 @@
         matches = Db.JobMatches
             .Where(m => m.ResumeId == parsedResume.Id)
             .OrderByDescending(m => m.MatchScore)
-            .Select(m => new JobMatch
-            {
-                Id = m.Id,
-                MatchScore = m.MatchScore,
-                Reasoning = m.Reasoning,
-                JobPosting = Db.JobPostings.First(j => j.Id == m.JobPostingId)
-            })
+            .Select(m => new JobMatch { Id = m.Id, MatchScore = m.MatchScore, Reasoning = m.Reasoning, JobPosting = Db.JobPostings.First(j => j.Id == m.JobPostingId) })
             .ToList();
 
         isProcessing = false;

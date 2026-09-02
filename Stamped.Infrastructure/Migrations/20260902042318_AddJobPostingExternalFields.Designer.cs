@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Stamped.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Stamped.Infrastructure.Data;
 namespace Stamped.Infrastructure.Migrations
 {
     [DbContext(typeof(StampedDbContext))]
-    partial class StampedDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260902042318_AddJobPostingExternalFields")]
+    partial class AddJobPostingExternalFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

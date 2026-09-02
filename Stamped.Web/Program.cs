@@ -3,12 +3,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Stamped.Core.CoverLetters;
 using Stamped.Core.Llm;
-using Stamped.Core.Matching;
+using Stamped.Core.Jobs;
 using Stamped.Core.Resumes;
 using Stamped.Infrastructure.CoverLetters;
 using Stamped.Infrastructure.Data;
 using Stamped.Infrastructure.Llm;
-using Stamped.Infrastructure.Matching;
+using Stamped.Infrastructure.Jobs;
 using Stamped.Infrastructure.Resumes;
 using Stamped.Web.Components;
 
@@ -39,6 +39,21 @@ builder.Services.AddScoped<ILlmProvider>(sp =>
 });
 #endregion
 
+#region Register the Adzuna Job API Source
+builder.Services.Configure<JobOptions>(builder.Configuration.GetSection("Jobs"));
+builder.Services.AddHttpClient<AdzunaJobSource>();
+
+builder.Services.AddScoped<IJobSource>(sp =>
+{
+    var opts = sp.GetRequiredService<IOptions<JobOptions>>().Value;
+    return opts.Source switch
+    {
+        "Adzuna" => sp.GetRequiredService<AdzunaJobSource>(),
+        "Folder" => new FolderJobSource(Path.Combine(builder.Environment.ContentRootPath, "Data", "jobs.json")),
+        _ => throw new NotSupportedException($"Unknown job source: {opts.Source}")
+    };
+});
+#endregion
 builder.Services.AddScoped<IResumeParser, PdfResumeParser>();
 builder.Services.AddScoped<IJobMatcher, LlmJobMatcher>();
 builder.Services.AddScoped<ICoverLetterDrafter, LlmCoverLetterDrafter>();
