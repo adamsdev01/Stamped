@@ -1,3 +1,4 @@
+using KristofferStrube.Blazor.WebMCP;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Stamped.Core.CoverLetters;
@@ -41,6 +42,7 @@ builder.Services.AddScoped<ILlmProvider>(sp =>
 builder.Services.AddScoped<IResumeParser, PdfResumeParser>();
 builder.Services.AddScoped<IJobMatcher, LlmJobMatcher>();
 builder.Services.AddScoped<ICoverLetterDrafter, LlmCoverLetterDrafter>();
+builder.Services.AddScoped<IModelContextService, ModelContextService>();
 
 var app = builder.Build();
 

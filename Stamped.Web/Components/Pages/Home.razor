@@ -1,42 +1,46 @@
 ﻿@page "/"
 @rendermode InteractiveServer
+@using System.Text.Json
 @using Stamped.Core.Resumes
 @using Stamped.Infrastructure.Data
 @using Stamped.Core.Matching
 @using Stamped.Core.Models
 @using Stamped.Core.CoverLetters
+@implements IAsyncDisposable
 @inject ICoverLetterDrafter CoverLetterDrafter
 @inject IResumeParser ResumeParser
 @inject IJobMatcher JobMatcher
 @inject StampedDbContext Db
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Home</PageTitle>
 
 <h1>Stamp It!</h1>
 
-<InputFile OnChange="HandleUpload" accept=".pdf" />
-
+<InputFile OnChange="HandleFileSelected" accept=".pdf" />
+<br />
 @if (isProcessing)
 {
-    <p>Reading resume...</p>
+    <p>@statusText</p>
 }
-
+<br />
 @if (parsedResume is not null)
 {
     <div>
         <p><strong>Most recent role:</strong> @parsedResume.MostRecentRole</p>
-        <p><strong>Years experience:</strong> @parsedResume.YearsExperience</p>
+        <p><strong>Years of experience:</strong> @parsedResume.YearsExperience</p>
         <p><strong>Skills:</strong> @string.Join(", ", parsedResume.Skills)</p>
     </div>
 }
+<br />
 @if (matches.Any())
 {
-    <h2>Matches</h2>
+    <h4>Job Matches</h4>
     <ul>
         @foreach (var m in matches)
         {
             <li>
-                <strong>@m.JobPosting.Title</strong> — @m.JobPosting.Company (@m.MatchScore%)
+                <strong>@m.JobPosting.Title</strong> — @m.JobPosting.Company (@m.MatchScore% Match)
                 <br /><em>@m.Reasoning</em>
                 <br />
                 <button @onclick="() => DraftLetter(m)">Draft cover letter</button>
@@ -44,11 +48,21 @@
         }
     </ul>
 }
+
 @if (currentApplication is not null)
 {
     <h2>Cover letter — @currentApplication.JobMatch.JobPosting.Title</h2>
     <p>Status: @currentApplication.Status</p>
     <pre style="white-space: pre-wrap;">@currentApplication.CoverLetter</pre>
+}
+
+@if (currentApplication is not null && currentApplication.Status == ApplicationStatus.Draft)
+{
+    <button @onclick="SubmitApplication">Approve &amp; submit</button>
+}
+@if (currentApplication is not null && currentApplication.Status == ApplicationStatus.Submitted)
+{
+    <p>Submitted at @currentApplication.SubmittedAt</p>
 }
 
 @code {
@@ -57,22 +71,50 @@
     private Resume? parsedResume;
     private List<JobMatch> matches = new();
     private JobApplication? currentApplication;
+    private byte[]? uploadedPdfBytes;
+    private string uploadedFileName = "";
 
-    private async Task HandleUpload(InputFileChangeEventArgs e)
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<Home>? _dotNetRef;
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
     {
-        isProcessing = true;
-        statusText = "Reading resume...";
-        StateHasChanged();
-
         var file = e.File;
         using var stream = file.OpenReadStream(maxAllowedSize: 10_000_000);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        uploadedPdfBytes = ms.ToArray();
+        uploadedFileName = file.Name;
 
-        parsedResume = await ResumeParser.ParseAsync(stream, file.Name);
+        await ParseResumeAsync();
+        await MatchJobsAsync();
+    }
+
+    private async Task<Resume> ParseResumeAsync()
+    {
+        if (uploadedPdfBytes is null) throw new InvalidOperationException("No resume uploaded yet.");
+
+        isProcessing = true;
+        statusText = "Reading resume...";
+        await InvokeAsync(StateHasChanged);
+
+        using var ms = new MemoryStream(uploadedPdfBytes);
+        parsedResume = await ResumeParser.ParseAsync(ms, uploadedFileName);
         Db.Resumes.Add(parsedResume);
         await Db.SaveChangesAsync();
 
+        isProcessing = false;
+        await InvokeAsync(StateHasChanged);
+        return parsedResume;
+    }
+
+    private async Task<List<JobMatch>> MatchJobsAsync()
+    {
+        if (parsedResume is null) throw new InvalidOperationException("Parse the resume first.");
+
+        isProcessing = true;
         statusText = "Matching jobs...";
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
 
         var jobs = Db.JobPostings.ToList();
         var results = await JobMatcher.MatchAsync(parsedResume, jobs);
@@ -93,34 +135,126 @@
             .ToList();
 
         isProcessing = false;
+        await InvokeAsync(StateHasChanged);
+        return matches;
     }
 
-    private async Task DraftLetter(JobMatch match)
+    private async Task<string> DraftCoverLetterAsync(int jobMatchId)
     {
-        statusText = "Drafting cover letter...";
+        var match = matches.FirstOrDefault(m => m.Id == jobMatchId)
+            ?? throw new InvalidOperationException($"No match with id {jobMatchId}.");
+
         isProcessing = true;
-        StateHasChanged();
+        statusText = "Drafting cover letter...";
+        await InvokeAsync(StateHasChanged);
 
         var letter = await CoverLetterDrafter.DraftAsync(parsedResume!, match.JobPosting);
 
-        var application = new JobApplication
-        {
-            JobMatchId = match.Id,
-            CoverLetter = letter,
-            Status = ApplicationStatus.Draft
-        };
-
+        var application = new JobApplication { JobMatchId = match.Id, CoverLetter = letter, Status = ApplicationStatus.Draft };
         Db.Applications.Add(application);
         await Db.SaveChangesAsync();
 
-        currentApplication = new JobApplication
-        {
-            Id = application.Id,
-            CoverLetter = application.CoverLetter,
-            Status = application.Status,
-            JobMatch = match
-        };
+        currentApplication = new JobApplication { Id = application.Id, CoverLetter = letter, Status = application.Status, JobMatch = match };
 
         isProcessing = false;
+        await InvokeAsync(StateHasChanged);
+        return letter;
+    }
+
+    private async Task DraftLetter(JobMatch match) => await DraftCoverLetterAsync(match.Id);
+
+    private async Task SubmitApplication()
+    {
+        if (currentApplication is null) return;
+
+        var appEntity = await Db.Applications.FindAsync(currentApplication.Id);
+        if (appEntity is null) return;
+
+        appEntity.Status = ApplicationStatus.Submitted;
+        appEntity.SubmittedAt = DateTime.UtcNow;
+        await Db.SaveChangesAsync();
+
+        currentApplication.Status = ApplicationStatus.Submitted;
+        currentApplication.SubmittedAt = appEntity.SubmittedAt;
+    }
+
+    // ---------- WebMCP registration via direct document.modelContext JS interop ----------
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        try
+        {
+            _module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/webmcp.js");
+            _dotNetRef = DotNetObjectReference.Create(this);
+            var registered = await _module.InvokeAsync<bool>("initWebMcp", _dotNetRef);
+
+            if (!registered)
+            {
+                // document.modelContext wasn't present — WebMCP unavailable in this browser/session.
+                // Page still works fine for a human clicking buttons; agent tool calls just won't be offered.
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // circuit already gone, nothing to clean up
+        }
+    }
+
+    // Single dispatcher every registered tool calls into. toolName picks the pipeline method;
+    // argsJson is parsed only for tools that need arguments.
+    [JSInvokable]
+    public async Task<string> ExecuteTool(string toolName, string argsJson)
+    {
+        try
+        {
+            switch (toolName)
+            {
+                case "parseResume":
+                    {
+                        var resume = await ParseResumeAsync();
+                        return $"Parsed {resume.FileName}: {resume.MostRecentRole}, {resume.YearsExperience} yrs, skills: {string.Join(", ", resume.Skills)}";
+                    }
+                case "matchJobs":
+                    {
+                        var results = await MatchJobsAsync();
+                        return string.Join("\n", results.Select(m =>
+                            $"{m.JobPosting.Title} at {m.JobPosting.Company}: {m.MatchScore}% (matchId={m.Id}) — {m.Reasoning}"));
+                    }
+                case "draftCoverLetter":
+                    {
+                        using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(argsJson) ? "{}" : argsJson);
+                        if (!doc.RootElement.TryGetProperty("matchId", out var matchIdProp))
+                            throw new InvalidOperationException("matchId is required.");
+                        var matchId = matchIdProp.GetInt32();
+                        return await DraftCoverLetterAsync(matchId);
+                    }
+                default:
+                    throw new InvalidOperationException($"Unknown tool: {toolName}");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Returned as the tool's result text so the agent sees a clear failure reason
+            // instead of the call just throwing.
+            return $"Error: {ex.Message}";
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module is not null)
+            {
+                await _module.InvokeVoidAsync("teardownWebMcp");
+                await _module.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException) { }
+        catch (ObjectDisposedException) { }
+
+        _dotNetRef?.Dispose();
     }
 }

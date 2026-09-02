@@ -28,7 +28,7 @@ namespace Stamped.Infrastructure.Matching
                 var userPrompt = $"""
                 CANDIDATE
                 Most recent role: {resume.MostRecentRole}
-                Years experience: {resume.YearsExperience}
+                Years of experience: {resume.YearsExperience}
                 Skills: {string.Join(", ", resume.Skills)}
 
                 JOB

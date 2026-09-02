@@ -28,7 +28,16 @@ namespace Stamped.Infrastructure.Resumes
             var rawText = text.ToString();
 
             // Ask the LLM to structure it
-            var systemPrompt = "You extract structured data from resumes. Respond with ONLY valid JSON, no markdown fences, no commentary. Schema: {\"mostRecentRole\": string, \"yearsExperience\": number, \"skills\": string[]}";
+            var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            var systemPrompt = """
+                You extract structured data from resumes. Respond with ONLY valid JSON, no markdown fences, no commentary.
+
+                For yearsExperience: find every job's start and end date (or "Present" for current roles) in the work history. 
+                Calculate total years of professional experience as the span from the earliest job start date to the most 
+                recent end date (or today, if currently employed). Do not count overlapping roles twice. Round to the nearest whole number.
+
+                Schema: {"mostRecentRole": string, "yearsExperience": number, "skills": string[]}
+                """ + $"\n\nToday's date is {today}.";
             var raw = await _llm.CompleteAsync(systemPrompt, rawText, ct);
 
             var cleaned = raw.Trim().TrimStart('`').TrimEnd('`').Replace("json", "", StringComparison.OrdinalIgnoreCase).Trim();
