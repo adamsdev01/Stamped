@@ -114,7 +114,7 @@
             {
                 <p class="desc">This is the one step your agent can't take for you.</p>
                 <div class="stamp-zone">
-                    <button class="stamp-btn" @onclick="SubmitApplication">Approve<br />&amp; submit</button>
+                    <button class="stamp-btn" @onclick="SubmitApplication">Go<br />&amp; apply</button>
                 </div>
                 <span class="tool-badge human">submitApplication() — human only, no tool registered</span>
             }
@@ -266,21 +266,6 @@
         currentApplication.Status = ApplicationStatus.Submitted;
         currentApplication.SubmittedAt = appEntity.SubmittedAt;
     }
-
-    // private async Task SubmitApplication()
-    // {
-    //     if (currentApplication is null) return;
-
-    //     var appEntity = await Db.Applications.FindAsync(currentApplication.Id);
-    //     if (appEntity is null) return;
-
-    //     appEntity.Status = ApplicationStatus.Submitted;
-    //     appEntity.SubmittedAt = DateTime.UtcNow;
-    //     await Db.SaveChangesAsync();
-
-    //     currentApplication.Status = ApplicationStatus.Submitted;
-    //     currentApplication.SubmittedAt = appEntity.SubmittedAt;
-    // }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
