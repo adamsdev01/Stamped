@@ -140,6 +140,7 @@
 
     private IJSObjectReference? _module;
     private DotNetObjectReference<Home>? _dotNetRef;
+    private IJSObjectReference? _siteModule;
 
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
     {
@@ -248,6 +249,16 @@
         var appEntity = await Db.Applications.FindAsync(currentApplication.Id);
         if (appEntity is null) return;
 
+        var externalUrl = currentApplication.JobMatch.JobPosting.ExternalUrl;
+
+        _siteModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/site.js");
+
+        if (!string.IsNullOrWhiteSpace(externalUrl))
+        {
+            await _siteModule.InvokeVoidAsync("openInNewTab", externalUrl);
+        }
+        await _siteModule.InvokeVoidAsync("copyToClipboard", currentApplication.CoverLetter);
+
         appEntity.Status = ApplicationStatus.Submitted;
         appEntity.SubmittedAt = DateTime.UtcNow;
         await Db.SaveChangesAsync();
@@ -255,6 +266,21 @@
         currentApplication.Status = ApplicationStatus.Submitted;
         currentApplication.SubmittedAt = appEntity.SubmittedAt;
     }
+
+    // private async Task SubmitApplication()
+    // {
+    //     if (currentApplication is null) return;
+
+    //     var appEntity = await Db.Applications.FindAsync(currentApplication.Id);
+    //     if (appEntity is null) return;
+
+    //     appEntity.Status = ApplicationStatus.Submitted;
+    //     appEntity.SubmittedAt = DateTime.UtcNow;
+    //     await Db.SaveChangesAsync();
+
+    //     currentApplication.Status = ApplicationStatus.Submitted;
+    //     currentApplication.SubmittedAt = appEntity.SubmittedAt;
+    // }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
