@@ -26,6 +26,7 @@ builder.Services.AddDbContext<StampedDbContext>(options =>
 builder.Services.Configure<LlmOptions>(builder.Configuration.GetSection("Llm"));
 builder.Services.AddHttpClient<OllamaLlmProvider>();
 builder.Services.AddHttpClient<AnthropicLlmProvider>();
+builder.Services.AddHttpClient<OpenAiLlmProvider>();
 
 builder.Services.AddScoped<ILlmProvider>(sp =>
 {
@@ -34,6 +35,7 @@ builder.Services.AddScoped<ILlmProvider>(sp =>
     {
         "Ollama" => sp.GetRequiredService<OllamaLlmProvider>(),
         "Anthropic" => sp.GetRequiredService<AnthropicLlmProvider>(),
+        "OpenAI" => sp.GetRequiredService<OpenAiLlmProvider>(),
         _ => throw new NotSupportedException($"Unknown LLM provider: {opts.Provider}")
     };
 });
