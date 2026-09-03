@@ -6,7 +6,7 @@ namespace Stamped.Core.Llm
 {
     public class LlmOptions
     {
-        public string Provider { get; set; } = "Ollama";
+        public string Provider { get; set; } = "OpenAI";
         public OllamaOptions Ollama { get; set; } = new();
         public AnthropicOptions Anthropic { get; set; } = new();
         public OpenAiOptions OpenAI { get; set; } = new();
