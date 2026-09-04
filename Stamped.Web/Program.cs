@@ -28,17 +28,24 @@ builder.Services.AddHttpClient<OllamaLlmProvider>();
 builder.Services.AddHttpClient<AnthropicLlmProvider>();
 builder.Services.AddHttpClient<OpenAiLlmProvider>();
 
-builder.Services.AddScoped<ILlmProvider>(sp =>
+if (builder.Configuration.GetValue<bool>("UseMockLlm"))
 {
-    var opts = sp.GetRequiredService<IOptions<LlmOptions>>().Value;
-    return opts.Provider switch
+    builder.Services.AddScoped<ILlmProvider, MockLlmProvider>();
+}
+else
+{
+    builder.Services.AddScoped<ILlmProvider>(sp =>
     {
-        "Ollama" => sp.GetRequiredService<OllamaLlmProvider>(),
-        "Anthropic" => sp.GetRequiredService<AnthropicLlmProvider>(),
-        "OpenAI" => sp.GetRequiredService<OpenAiLlmProvider>(),
-        _ => throw new NotSupportedException($"Unknown LLM provider: {opts.Provider}")
-    };
-});
+        var opts = sp.GetRequiredService<IOptions<LlmOptions>>().Value;
+        return opts.Provider switch
+        {
+            "Ollama" => sp.GetRequiredService<OllamaLlmProvider>(),
+            "Anthropic" => sp.GetRequiredService<AnthropicLlmProvider>(),
+            "OpenAI" => sp.GetRequiredService<OpenAiLlmProvider>(),
+            _ => throw new NotSupportedException($"Unknown LLM provider: {opts.Provider}")
+        };
+    });
+}
 #endregion
 
 #region Register the Adzuna Job API Source

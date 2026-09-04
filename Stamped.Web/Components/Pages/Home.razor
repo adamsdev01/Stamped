@@ -195,7 +195,8 @@
         statusText = "Matching jobs...";
         await InvokeAsync(StateHasChanged);
 
-        var jobs = Db.JobPostings.Where(j => j.Source == "adzuna").ToList();
+        //var jobs = Db.JobPostings.Where(j => j.Source == "adzuna").ToList();
+        var jobs = fetched;
         var results = await JobMatcher.MatchAsync(parsedResume, jobs);
 
         Db.JobMatches.AddRange(results);
