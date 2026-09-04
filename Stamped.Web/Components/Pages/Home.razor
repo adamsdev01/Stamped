@@ -108,7 +108,7 @@
         <!-- Step 4: human approval -->
         <div class="step approval-panel">
             <div class="eyebrow">Human sign-off required</div>
-            <div class="step-title center">Review &amp; submit</div>
+            <div class="step-title center">Review &amp; approve</div>
 
             @if (currentApplication.Status == ApplicationStatus.Draft)
             {
@@ -120,7 +120,7 @@
             }
             else if (currentApplication.Status == ApplicationStatus.Submitted)
             {
-                <p class="submitted-note">Submitted at @currentApplication.SubmittedAt</p>
+                <p class="submitted-note">Approved at @currentApplication.SubmittedAt</p>
             }
         </div>
     }

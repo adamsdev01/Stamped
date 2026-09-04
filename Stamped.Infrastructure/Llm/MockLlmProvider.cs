@@ -20,13 +20,10 @@ namespace Stamped.Infrastructure.Llm
         {
             if (systemPrompt.Contains("employmentRanges", StringComparison.OrdinalIgnoreCase))
                 return Task.FromResult(MockResumeParse());
-
             if (systemPrompt.Contains("scores how well a candidate fits", StringComparison.OrdinalIgnoreCase))
                 return Task.FromResult(MockJobScore(userPrompt));
-
             if (systemPrompt.Contains("cover letters", StringComparison.OrdinalIgnoreCase))
                 return Task.FromResult(MockCoverLetter(userPrompt));
-
             // Fallback — shouldn't normally hit this
             return Task.FromResult("{}");
         }
@@ -34,15 +31,15 @@ namespace Stamped.Infrastructure.Llm
         private static string MockResumeParse()
         {
             return """
-            {
-                "mostRecentRole": "Senior Software Engineer",
-                "skills": ["C#", ".NET", "SQL Server", "Azure", "React", "REST APIs"],
-                "employmentRanges": [
-                    { "start": "2021-04", "end": "present" },
-                    { "start": "2018-01", "end": "2021-03" }
-                ]
-            }
-            """;
+        {
+            "mostRecentRole": "Accounting Manager",
+            "skills": ["GAAP", "Financial Reporting", "Month-End Close", "Budgeting & Forecasting", "QuickBooks", "NetSuite", "Excel", "Team Leadership", "Audit Coordination"],
+            "employmentRanges": [
+                { "start": "2020-06", "end": "present" },
+                { "start": "2016-09", "end": "2020-05" }
+            ]
+        }
+        """;
         }
 
         private static string MockJobScore(string userPrompt)
@@ -55,12 +52,12 @@ namespace Stamped.Infrastructure.Llm
             var score = 55 + (Math.Abs(title.GetHashCode()) % 41); // range: 55–95
 
             var reasoning = score >= 80
-                ? $"Strong alignment between the candidate's experience and the {title} role at {company}."
+                ? $"Strong alignment between the candidate's month-end close and GAAP reporting experience and the {title} role at {company}."
                 : score >= 65
-                ? $"Reasonable fit for {title}, with some gaps against {company}'s stated requirements."
-                : $"Partial match for {title}; candidate's background only partially overlaps with {company}'s needs.";
+                ? $"Reasonable fit for {title}, with some gaps against {company}'s stated requirements around forecasting or team leadership scope."
+                : $"Partial match for {title}; candidate's accounting background only partially overlaps with {company}'s needs.";
 
-            var json = JsonSerializer.Serialize(new { score, reasoning });
+            var json = System.Text.Json.JsonSerializer.Serialize(new { score, reasoning });
             return json;
         }
 
@@ -68,20 +65,20 @@ namespace Stamped.Infrastructure.Llm
         {
             var title = ExtractField(userPrompt, "Title") ?? "the position";
             var company = ExtractField(userPrompt, "Company") ?? "your company";
-            var role = ExtractField(userPrompt, "Most recent role") ?? "my current role";
+            var role = ExtractField(userPrompt, "Most recent role") ?? "my current role as Accounting Manager";
 
             return $"""
-            I'm writing to apply for the {title} position at {company}. In my current role as {role}, I've built hands-on experience across the core skills this position calls for, and I'm confident that background translates directly to the work your team is doing.
+        I'm writing to apply for the {title} position at {company}. In my current role as {role}, I've led month-end close, GAAP-compliant financial reporting, and budgeting cycles, and I'm confident that background translates directly to the work your team is doing.
 
-            What draws me to {company} specifically is the opportunity to apply that experience against real, production-scale problems rather than isolated exercises. I've consistently focused on writing maintainable code, collaborating closely with cross-functional teams, and shipping features that hold up under real usage.
+        What draws me to {company} specifically is the opportunity to apply that experience against real, growing financial operations rather than static reporting cycles. I've consistently focused on tightening close timelines, coordinating clean audits, and building forecasting processes the rest of the business can rely on.
 
-            I'd welcome the chance to discuss how my background fits {title} in more detail. Thank you for your consideration.
-            """;
+        I'd welcome the chance to discuss how my background fits {title} in more detail. Thank you for your consideration.
+        """;
         }
 
         private static string? ExtractField(string prompt, string label)
         {
-            var match = Regex.Match(prompt, $@"{Regex.Escape(label)}:\s*(.+)");
+            var match = System.Text.RegularExpressions.Regex.Match(prompt, $@"{System.Text.RegularExpressions.Regex.Escape(label)}:\s*(.+)");
             return match.Success ? match.Groups[1].Value.Trim() : null;
         }
     }
